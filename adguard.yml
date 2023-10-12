@@ -1,0 +1,88 @@
+---
+- name: Default Packages
+  hosts: all
+  become: yes 
+  vars:
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_user: 'ansible_user'
+    ports:
+      - 80
+      - 443
+      - 53
+      - 3000
+      - 853
+      - 784
+      - 8853
+      - 5443
+      
+  tasks:
+    - name: AdGuard - RHEL Install
+      shell:
+        cmd: |
+          yum install epel* -y
+      when:
+        - ansible_os_family == "RedHat"
+        - hostname == "adguard"
+        
+    - name: AdGuard - Install Package
+      package:
+        name: "{{ item }}"
+      with_items:
+        - curl
+        - tar
+        - snapd
+      when:
+        - hostname == "adguard"
+        
+    - name: AdGuard - Debian - Install Package
+      package:
+        name: "{{ item }}"
+      with_items:
+        - ufw
+      when: 
+        - ansible_os_family == "Debian"
+        - hostname == "adguard"
+        
+    - name: Adguard - Firewalld
+      firewalld:
+        port: "{{ item }}/tcp"
+        permanent: yes
+        state: enabled
+      with_items: "{{ ports }}"
+      when: 
+        - ansible_os_family == "RedHat"
+        - hostname == "adguard"
+        
+    - name: AdGuard - Firewalld Reload
+      shell:
+        cmd: |
+          firewall-cmd --reload
+      when:
+        - ansible_os_family == "RedHat"
+        - hostname == "adguard"
+    
+    - name: Adguard - UFW
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      with_items: "{{ ports }}"
+      when: 
+        - ansible_os_family == "Debian"
+        - hostname == "adguard"
+        
+    - name: AdGuard - Firewalld reload
+      shell:
+        cmd: |
+          firewall-cmd --reload
+      when:
+        - hostname == "adguard"
+        - ansible_os_family == "RedHat"
+
+    - name: AdGuard - Install
+      shell:
+        cmd: |
+          curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
+          /opt/AdGuardHome/AdGuardHome -s start
+      when:
+        - hostname == "adguard"
